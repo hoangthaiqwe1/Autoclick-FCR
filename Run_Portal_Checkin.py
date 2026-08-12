@@ -230,8 +230,31 @@ def wait_and_login():
             time.sleep(1)
             run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
             time.sleep(6)
-            run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
-            time.sleep(6)
+            
+            # Kiem tra MFA - neu bi hoi thi cho toi da 2 phut de user approve tren dien thoai
+            for mfa_wait in range(24):  # 24 x 5s = 120s = 2 phut
+                tabs = get_page_tabs()
+                if tabs:
+                    for t in tabs:
+                        if t.get("type") == "page": url = t.get("url", ""); break
+                    # Da login xong
+                    if "work-attendance" in url or "hrportal" in url:
+                        log("  Login thanh cong!")
+                        return True
+                    # Con o trang Microsoft (co the MFA hoac Stay signed in)
+                    if "microsoftonline" in url:
+                        # Thu click Stay signed in
+                        run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
+                        if mfa_wait == 0:
+                            log("  Dang cho xac thuc MFA (approve tren dien thoai)...")
+                        time.sleep(5)
+                        continue
+                    else:
+                        # Da chuyen sang trang khac
+                        return True
+                time.sleep(5)
+            
+            log("  Het thoi gian cho MFA (2 phut)")
             return True
     return False
 
