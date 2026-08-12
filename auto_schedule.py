@@ -515,6 +515,10 @@ def do_checkin():
     wait_and_check_login()
     time.sleep(3)
 
+    # Dam bao dang o trang work-attendance truoc khi goi API
+    navigate_to(HR_PORTAL_URL)
+    time.sleep(5)
+
     js = """
     (function() {
         return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/check-in', {
@@ -546,6 +550,10 @@ def do_checkout():
 
     wait_and_check_login()
     time.sleep(3)
+
+    # Dam bao dang o trang work-attendance truoc khi goi API
+    navigate_to(HR_PORTAL_URL)
+    time.sleep(5)
 
     js = """
     (function() {

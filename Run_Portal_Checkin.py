@@ -362,6 +362,10 @@ def main():
     log("LOGIN THANH CONG!")
     print("")
 
+    # Dam bao dang o trang work-attendance truoc khi goi API
+    run_js("window.location.href='https://hrportal.fecredit.com.vn/work-attendance';")
+    time.sleep(5)
+
     # Buoc 2: Kiem tra check-in
     log("Buoc 2: Kiem tra check-in...")
     
