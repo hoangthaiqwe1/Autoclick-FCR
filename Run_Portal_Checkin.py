@@ -19,11 +19,27 @@ from datetime import datetime, timedelta
 
 # ==================== CAU HINH ====================
 HR_PORTAL_URL = "https://hrportal.fecredit.com.vn/work-attendance"
-HR_USERNAME = "thai.dang.4@fecredit.com.vn"
-HR_PASSWORD = "TCBtcb@110411045"
 
-WORK_DURATION_HOURS = 9
-WORK_DURATION_MINUTES = 30
+# Doc tu file .env
+def load_env_file():
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if not os.path.exists(env_path):
+        return
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip())
+
+load_env_file()
+
+HR_USERNAME = os.getenv("HR_USERNAME", "thai.dang.4@fecredit.com.vn")
+HR_PASSWORD = os.getenv("HR_PASSWORD", "")
+CHECKOUT_HOUR = int(os.getenv("CHECKOUT_HOUR", 20))
+CHECKOUT_MINUTE = int(os.getenv("CHECKOUT_MINUTE", 0))
 
 CHROME_PATHS = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -300,12 +316,16 @@ def main():
 
     print("")
 
-    # Buoc 3: Set gio check-out (20 giay de nhap, khong nhap thi mac dinh)
+    # Buoc 3: Set gio check-out (mac dinh 20:00, lay tu .env)
     checkin_time = get_checkin_time_today() or datetime.now()
-    default_checkout = checkin_time + timedelta(hours=WORK_DURATION_HOURS, minutes=WORK_DURATION_MINUTES)
+    default_checkout = datetime.now().replace(hour=CHECKOUT_HOUR, minute=CHECKOUT_MINUTE, second=0, microsecond=0)
+    
+    # Neu gio checkout da qua -> hieu la ngay mai
+    if default_checkout <= datetime.now():
+        default_checkout += timedelta(days=1)
 
     print(f"  Check-in luc:         {checkin_time.strftime('%H:%M')}")
-    print(f"  Check-out mac dinh:   {default_checkout.strftime('%H:%M')} (sau {WORK_DURATION_HOURS}h{WORK_DURATION_MINUTES:02d})")
+    print(f"  Check-out mac dinh:   {default_checkout.strftime('%H:%M')}")
     print("")
 
     user_input = input_with_timeout("  Nhap gio check-out (VD: 17:30) [30s]: ", 30)

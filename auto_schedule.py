@@ -37,9 +37,9 @@ HR_PORTAL_URL = os.getenv("HR_PORTAL_URL", "https://hrportal.fecredit.com.vn/wor
 HR_USERNAME = os.getenv("HR_USERNAME", "")
 HR_PASSWORD = os.getenv("HR_PASSWORD", "")
 
-# Thoi gian lam viec (9 tieng 30 phut)
-WORK_DURATION_HOURS = 9
-WORK_DURATION_MINUTES = 30
+# Gio check-out mac dinh (lay tu .env, khong co thi 20:00)
+CHECKOUT_HOUR = int(os.getenv("CHECKOUT_HOUR", 20))
+CHECKOUT_MINUTE = int(os.getenv("CHECKOUT_MINUTE", 0))
 
 # Chrome path
 CHROME_PATHS = [
@@ -567,8 +567,10 @@ def main():
     do_checkin()
     checkin_time = get_checkin_time_today() or datetime.now()
 
-    # Tinh gio check-out
-    checkout_time = checkin_time + timedelta(hours=WORK_DURATION_HOURS, minutes=WORK_DURATION_MINUTES)
+    # Gio check-out co dinh (lay tu .env, mac dinh 20:00)
+    checkout_time = datetime.now().replace(hour=CHECKOUT_HOUR, minute=CHECKOUT_MINUTE, second=0, microsecond=0)
+    if checkout_time <= datetime.now():
+        checkout_time += timedelta(days=1)
     log(f"   Check-in:  {checkin_time.strftime('%H:%M')}")
     log(f"   Check-out: {checkout_time.strftime('%H:%M')}")
     log("")
