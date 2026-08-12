@@ -1,0 +1,16 @@
+# Environment variables (chua mat khau)
+.env
+
+# Chrome profile data
+chrome_profile/
+
+# Log files
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Local records
+last_checkin.txt
