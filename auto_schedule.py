@@ -447,10 +447,13 @@ def wait_and_check_login():
 
 def get_today_attendance():
     """Lay thong tin cham cong hom nay tu API HR Portal."""
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    now = datetime.now()
+    month = now.strftime("%m")
+    year = now.strftime("%Y")
+    today_str = now.strftime("%Y-%m-%d")
     js = """
     (function() {
-        return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/history?from=""" + today_str + """&to=""" + today_str + """', {
+        return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/attendance-in-period?Month=""" + month + """&Year=""" + year + """', {
             method: 'GET',
             headers: {'Accept': 'application/json'},
             credentials: 'include'
@@ -464,19 +467,16 @@ def get_today_attendance():
             value = r.get("result", {}).get("result", {}).get("value", "")
             if value and not value.startswith("ERR"):
                 data = json.loads(value)
-                if isinstance(data, dict):
-                    records = data.get("data", data.get("items", []))
-                    if isinstance(records, list) and len(records) > 0:
-                        record = records[0]
-                        return {
-                            "checkin": record.get("checkIn", record.get("checkinTime", record.get("check_in", ""))),
-                            "checkout": record.get("checkOut", record.get("checkoutTime", record.get("check_out", "")))
-                        }
-                    elif isinstance(records, dict):
-                        return {
-                            "checkin": records.get("checkIn", records.get("checkinTime", "")),
-                            "checkout": records.get("checkOut", records.get("checkoutTime", ""))
-                        }
+                if isinstance(data, dict) and data.get("status"):
+                    records = data.get("data", [])
+                    for record in records:
+                        check_date = record.get("checkDate", "")
+                        if check_date.startswith(today_str):
+                            return {
+                                "checkin": record.get("checkInTime"),
+                                "checkout": record.get("checkOutTime"),
+                                "status": record.get("status")
+                            }
         except:
             pass
     return None

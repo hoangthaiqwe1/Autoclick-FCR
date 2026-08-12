@@ -239,10 +239,13 @@ def wait_and_login():
 # === CHECK-IN / CHECK-OUT ===
 def get_today_attendance():
     """Lay thong tin cham cong hom nay tu API HR Portal."""
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    now = datetime.now()
+    month = now.strftime("%m")
+    year = now.strftime("%Y")
+    today_str = now.strftime("%Y-%m-%d")
     js = """
     (function() {
-        return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/history?from=""" + today_str + """&to=""" + today_str + """', {
+        return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/attendance-in-period?Month=""" + month + """&Year=""" + year + """', {
             method: 'GET',
             headers: {'Accept': 'application/json'},
             credentials: 'include'
@@ -256,19 +259,16 @@ def get_today_attendance():
             value = r.get("result", {}).get("result", {}).get("value", "")
             if value and not value.startswith("ERR"):
                 data = json.loads(value)
-                if isinstance(data, dict):
-                    records = data.get("data", data.get("items", []))
-                    if isinstance(records, list) and len(records) > 0:
-                        record = records[0]
-                        return {
-                            "checkin": record.get("checkIn", record.get("checkinTime", record.get("check_in", ""))),
-                            "checkout": record.get("checkOut", record.get("checkoutTime", record.get("check_out", "")))
-                        }
-                    elif isinstance(records, dict):
-                        return {
-                            "checkin": records.get("checkIn", records.get("checkinTime", "")),
-                            "checkout": records.get("checkOut", records.get("checkoutTime", ""))
-                        }
+                if isinstance(data, dict) and data.get("status"):
+                    records = data.get("data", [])
+                    for record in records:
+                        check_date = record.get("checkDate", "")
+                        if check_date.startswith(today_str):
+                            return {
+                                "checkin": record.get("checkInTime"),
+                                "checkout": record.get("checkOutTime"),
+                                "status": record.get("status")
+                            }
         except:
             pass
     return None
@@ -345,28 +345,21 @@ def main():
     # Lay thong tin cham cong thuc tu API
     attendance = get_today_attendance()
     if attendance:
-        log(f"  API attendance: {attendance}")
+        log(f"  API: check-in={attendance.get('checkin')}, status={attendance.get('status')}")
     
-    if already_checked_in_today() or (attendance and attendance.get("checkin")):
-        checkin_display = ""
-        if attendance and attendance.get("checkin"):
-            checkin_display = attendance["checkin"]
-        else:
-            ct = get_checkin_time_today()
-            checkin_display = ct.strftime('%H:%M') if ct else '?'
+    if (attendance and attendance.get("checkin")) or already_checked_in_today():
+        checkin_display = attendance["checkin"] if attendance and attendance.get("checkin") else "?"
         log(f"  Da check-in luc {checkin_display}")
     else:
         log("  Chua check-in, dang check-in...")
         time.sleep(2)
         do_checkin()
-        # Lay lai thong tin tu API sau khi check-in
         time.sleep(3)
         attendance = get_today_attendance()
 
     print("")
 
     # Buoc 3: Set gio check-out (mac dinh 20:00, lay tu .env)
-    checkin_time = get_checkin_time_today() or datetime.now()
     default_checkout = datetime.now().replace(hour=CHECKOUT_HOUR, minute=CHECKOUT_MINUTE, second=0, microsecond=0)
     
     # Neu gio checkout da qua -> hieu la ngay mai
@@ -374,11 +367,7 @@ def main():
         default_checkout += timedelta(days=1)
 
     # Hien thi gio check-in thuc tu API
-    checkin_display = ""
-    if attendance and attendance.get("checkin"):
-        checkin_display = attendance["checkin"]
-    else:
-        checkin_display = checkin_time.strftime('%H:%M')
+    checkin_display = attendance["checkin"] if attendance and attendance.get("checkin") else "N/A"
     
     print(f"  Check-in luc (API):   {checkin_display}")
     print(f"  Check-out mac dinh:   {default_checkout.strftime('%H:%M')}")
