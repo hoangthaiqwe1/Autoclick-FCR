@@ -445,6 +445,43 @@ def wait_and_check_login():
     return False
 
 
+def get_today_attendance():
+    """Lay thong tin cham cong hom nay tu API HR Portal."""
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    js = """
+    (function() {
+        return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/history?from=""" + today_str + """&to=""" + today_str + """', {
+            method: 'GET',
+            headers: {'Accept': 'application/json'},
+            credentials: 'include'
+        }).then(function(r) { return r.text(); })
+        .catch(function(e) { return 'ERR:' + e.message; });
+    })()
+    """
+    r = run_js_in_tab(js)
+    if r:
+        try:
+            value = r.get("result", {}).get("result", {}).get("value", "")
+            if value and not value.startswith("ERR"):
+                data = json.loads(value)
+                if isinstance(data, dict):
+                    records = data.get("data", data.get("items", []))
+                    if isinstance(records, list) and len(records) > 0:
+                        record = records[0]
+                        return {
+                            "checkin": record.get("checkIn", record.get("checkinTime", record.get("check_in", ""))),
+                            "checkout": record.get("checkOut", record.get("checkoutTime", record.get("check_out", "")))
+                        }
+                    elif isinstance(records, dict):
+                        return {
+                            "checkin": records.get("checkIn", records.get("checkinTime", "")),
+                            "checkout": records.get("checkOut", records.get("checkoutTime", ""))
+                        }
+        except:
+            pass
+    return None
+
+
 def do_checkin():
     if datetime.now().weekday() >= 5:
         log("Cuoi tuan - bo qua")
@@ -566,6 +603,16 @@ def main():
     # Check-in
     do_checkin()
     checkin_time = get_checkin_time_today() or datetime.now()
+
+    # Lay gio check-in thuc tu API
+    time.sleep(3)
+    attendance = get_today_attendance()
+    checkin_display = ""
+    if attendance and attendance.get("checkin"):
+        checkin_display = attendance["checkin"]
+        log(f"   Check-in (API): {checkin_display}")
+    else:
+        log(f"   Check-in (local): {checkin_time.strftime('%H:%M')}")
 
     # Gio check-out co dinh (lay tu .env, mac dinh 20:00)
     checkout_time = datetime.now().replace(hour=CHECKOUT_HOUR, minute=CHECKOUT_MINUTE, second=0, microsecond=0)

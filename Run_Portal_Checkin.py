@@ -237,6 +237,42 @@ def wait_and_login():
 
 
 # === CHECK-IN / CHECK-OUT ===
+def get_today_attendance():
+    """Lay thong tin cham cong hom nay tu API HR Portal."""
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    js = """
+    (function() {
+        return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/history?from=""" + today_str + """&to=""" + today_str + """', {
+            method: 'GET',
+            headers: {'Accept': 'application/json'},
+            credentials: 'include'
+        }).then(function(r) { return r.text(); })
+        .catch(function(e) { return 'ERR:' + e.message; });
+    })()
+    """
+    r = run_js(js)
+    if r:
+        try:
+            value = r.get("result", {}).get("result", {}).get("value", "")
+            if value and not value.startswith("ERR"):
+                data = json.loads(value)
+                if isinstance(data, dict):
+                    records = data.get("data", data.get("items", []))
+                    if isinstance(records, list) and len(records) > 0:
+                        record = records[0]
+                        return {
+                            "checkin": record.get("checkIn", record.get("checkinTime", record.get("check_in", ""))),
+                            "checkout": record.get("checkOut", record.get("checkoutTime", record.get("check_out", "")))
+                        }
+                    elif isinstance(records, dict):
+                        return {
+                            "checkin": records.get("checkIn", records.get("checkinTime", "")),
+                            "checkout": records.get("checkOut", records.get("checkoutTime", ""))
+                        }
+        except:
+            pass
+    return None
+
 def do_checkin():
     log(">>> CHECK-IN")
     r = run_js("""(function(){return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/check-in',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},credentials:'include'}).then(function(r){return r.text().then(function(t){return'STATUS:'+r.status+' '+t;});}).catch(function(e){return'ERR:'+e.message;});})()""")
@@ -305,14 +341,27 @@ def main():
 
     # Buoc 2: Kiem tra check-in
     log("Buoc 2: Kiem tra check-in...")
-    if already_checked_in_today():
-        checkin_time = get_checkin_time_today()
-        log(f"  Da check-in luc {checkin_time.strftime('%H:%M') if checkin_time else '?'}")
+    
+    # Lay thong tin cham cong thuc tu API
+    attendance = get_today_attendance()
+    if attendance:
+        log(f"  API attendance: {attendance}")
+    
+    if already_checked_in_today() or (attendance and attendance.get("checkin")):
+        checkin_display = ""
+        if attendance and attendance.get("checkin"):
+            checkin_display = attendance["checkin"]
+        else:
+            ct = get_checkin_time_today()
+            checkin_display = ct.strftime('%H:%M') if ct else '?'
+        log(f"  Da check-in luc {checkin_display}")
     else:
         log("  Chua check-in, dang check-in...")
         time.sleep(2)
         do_checkin()
-        checkin_time = datetime.now()
+        # Lay lai thong tin tu API sau khi check-in
+        time.sleep(3)
+        attendance = get_today_attendance()
 
     print("")
 
@@ -324,7 +373,14 @@ def main():
     if default_checkout <= datetime.now():
         default_checkout += timedelta(days=1)
 
-    print(f"  Check-in luc:         {checkin_time.strftime('%H:%M')}")
+    # Hien thi gio check-in thuc tu API
+    checkin_display = ""
+    if attendance and attendance.get("checkin"):
+        checkin_display = attendance["checkin"]
+    else:
+        checkin_display = checkin_time.strftime('%H:%M')
+    
+    print(f"  Check-in luc (API):   {checkin_display}")
     print(f"  Check-out mac dinh:   {default_checkout.strftime('%H:%M')}")
     print("")
 
