@@ -192,7 +192,8 @@ def wait_and_login():
         
         log(f"  [{attempt+1}] {url[:70]}")
 
-        if "work-attendance" in url:
+        if "work-attendance" in url or ("hrportal" in url and "sign-in" not in url):
+            log("  Login thanh cong!")
             return True
 
         if "sign-in" in url and "microsoftonline" not in url:
@@ -204,15 +205,38 @@ def wait_and_login():
             # Pick account
             r = run_js("""(function(){var t=document.getElementById('tilesHolder');if(t){var f=t.querySelector('div[tabindex],div.table-row,[data-test-id]');if(f){f.click();return'PICKED';}}var rows=document.querySelectorAll('.table-row,[role="button"]');for(var i=0;i<rows.length;i++){if(rows[i].textContent.indexOf('thai.dang')!==-1||rows[i].textContent.indexOf('fecredit')!==-1){rows[i].click();return'PICKED';}}return'NO';})()""")
             if r and "PICKED" in str(r):
-                time.sleep(8)
+                # Cho redirect sau pick account (Face Auth co the login xong luon)
+                for wait in range(12):  # 60s max
+                    time.sleep(5)
+                    tabs = get_page_tabs()
+                    if tabs:
+                        for t in tabs:
+                            if t.get("type") == "page": url = t.get("url", ""); break
+                        if "work-attendance" in url or ("hrportal" in url and "sign-in" not in url):
+                            log("  Login thanh cong (Face Auth)!")
+                            return True
+                        # Neu van o Microsoft thi co the can nhap pass
+                        if "microsoftonline" in url:
+                            # Check xem co password field khong
+                            check = run_js("""(function(){if(document.querySelector('input[name="passwd"],#i0118'))return'PASS';if(document.getElementById('idSIButton9'))return'BTN';return'WAIT';})()""")
+                            if check and ("PASS" in str(check) or "BTN" in str(check)):
+                                break  # Can nhap pass hoac click button
+                            continue
+                        else:
+                            break
+                
+                # Check lai URL sau khi cho
                 tabs = get_page_tabs()
                 if tabs:
                     for t in tabs:
                         if t.get("type") == "page": url = t.get("url", ""); break
-                    if "work-attendance" in url: return True
+                    if "work-attendance" in url or ("hrportal" in url and "sign-in" not in url):
+                        log("  Login thanh cong!")
+                        return True
 
+            # Neu van o Microsoft -> thu nhap email/password
             # Email
-            for _ in range(10):
+            for _ in range(5):
                 time.sleep(2)
                 r = run_js(f"""(function(){{var f=document.querySelector('input[name="loginfmt"],#i0116');if(f){{f.focus();f.value='{HR_USERNAME}';f.dispatchEvent(new Event('input',{{bubbles:true}}));return'OK';}}if(document.querySelector('input[name="passwd"],#i0118'))return'PASS';return'W';}})()""")
                 if r and ("'OK'" in str(r) or "PASS" in str(r)): break
@@ -222,8 +246,16 @@ def wait_and_login():
                 run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
 
             # Password
-            for _ in range(10):
+            for _ in range(5):
                 time.sleep(2)
+                # Check URL truoc — co the da redirect
+                tabs = get_page_tabs()
+                if tabs:
+                    for t in tabs:
+                        if t.get("type") == "page": url = t.get("url", ""); break
+                    if "work-attendance" in url or ("hrportal" in url and "sign-in" not in url):
+                        log("  Login thanh cong!")
+                        return True
                 r = run_js(f"""(function(){{var f=document.querySelector('input[name="passwd"],#i0118');if(f){{f.focus();f.value='{HR_PASSWORD}';f.dispatchEvent(new Event('input',{{bubbles:true}}));return'OK';}}return'W';}})()""")
                 if r and "'OK'" in str(r): break
 
@@ -231,30 +263,26 @@ def wait_and_login():
             run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
             time.sleep(6)
             
-            # Kiem tra MFA - neu bi hoi thi cho toi da 2 phut de user approve tren dien thoai
-            for mfa_wait in range(24):  # 24 x 5s = 120s = 2 phut
+            # Cho redirect ve hrportal (MFA/Stay signed in)
+            for mfa_wait in range(24):  # 24 x 5s = 120s
                 tabs = get_page_tabs()
                 if tabs:
                     for t in tabs:
                         if t.get("type") == "page": url = t.get("url", ""); break
-                    # Da login xong
-                    if "work-attendance" in url or "hrportal" in url:
+                    if "work-attendance" in url or ("hrportal" in url and "sign-in" not in url):
                         log("  Login thanh cong!")
                         return True
-                    # Con o trang Microsoft (co the MFA hoac Stay signed in)
                     if "microsoftonline" in url:
-                        # Thu click Stay signed in
                         run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
                         if mfa_wait == 0:
-                            log("  Dang cho xac thuc MFA (approve tren dien thoai)...")
+                            log("  Dang cho xac thuc MFA...")
                         time.sleep(5)
                         continue
                     else:
-                        # Da chuyen sang trang khac
                         return True
                 time.sleep(5)
             
-            log("  Het thoi gian cho MFA (2 phut)")
+            log("  Het thoi gian cho MFA")
             return True
     return False
 
