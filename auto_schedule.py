@@ -532,11 +532,15 @@ def do_checkin():
     result = run_js_in_tab(js)
     log(f"CHECK-IN: {result}")
 
-    if result and ("STATUS:200" in str(result) or "STATUS:201" in str(result)):
+    result_str = str(result)
+    if "STATUS:200" in result_str or "STATUS:201" in result_str:
         mark_checked_in()
         log("CHECK-IN THANH CONG!")
         time.sleep(2)
         run_js_in_tab("window.location.href='https://hrportal.fecredit.com.vn/work-attendance';")
+    elif "CHECKIN_FAILED" in result_str or '"code":"11"' in result_str:
+        mark_checked_in()
+        log("Da check-in truoc do roi (API tra CHECKIN_FAILED)")
 
 
 def do_checkout():

@@ -328,10 +328,16 @@ def do_checkin():
     log(">>> CHECK-IN")
     r = run_js("""(function(){return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/check-in',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},credentials:'include'}).then(function(r){return r.text().then(function(t){return'STATUS:'+r.status+' '+t;});}).catch(function(e){return'ERR:'+e.message;});})()""")
     log(f"  {r}")
-    if r and ("STATUS:200" in str(r) or "STATUS:201" in str(r)):
+    r_str = str(r)
+    if "STATUS:200" in r_str or "STATUS:201" in r_str:
         mark_checked_in()
         log("  CHECK-IN THANH CONG!")
         run_js("window.location.href='https://hrportal.fecredit.com.vn/work-attendance';")
+        return True
+    elif "CHECKIN_FAILED" in r_str or '"code":"11"' in r_str:
+        # Da check-in truoc do roi (API tu choi check-in lan 2)
+        mark_checked_in()
+        log("  Da check-in truoc do roi (API tra CHECKIN_FAILED)")
         return True
     return False
 
