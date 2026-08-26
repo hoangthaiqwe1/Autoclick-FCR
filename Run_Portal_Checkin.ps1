@@ -437,6 +437,11 @@ function Main {
     # Buoc 2: Kiem tra check-in
     Write-Log "Buoc 2: Kiem tra check-in..."
     $attendance = Get-TodayAttendance
+    # Retry neu lan dau fail
+    if (-not $attendance) {
+        Start-Sleep -Seconds 3
+        $attendance = Get-TodayAttendance
+    }
 
     if ($attendance) {
         Write-Log "  API: check-in=$($attendance.checkin), status=$($attendance.status)"
@@ -470,24 +475,25 @@ function Main {
     Write-Host "  Nhap gio check-out (VD: 17:30) [30s]: " -NoNewline
     $checkoutTime = $defaultCheckout
     
-    $task = [System.Threading.Tasks.Task]::Run({ [Console]::ReadLine() })
-    if ($task.Wait(30000)) {
-        $userInput = $task.Result
-        if ($userInput -and $userInput.Trim()) {
-            try {
-                $parts = $userInput.Trim().Replace("h", ":").Replace("H", ":").Split(":")
-                $h = [int]$parts[0]
-                $m = if ($parts.Length -gt 1) { [int]$parts[1] } else { 0 }
-                $checkoutTime = (Get-Date).Date.AddHours($h).AddMinutes($m)
-                if ($checkoutTime -le (Get-Date)) { $checkoutTime = $checkoutTime.AddDays(1) }
-                Write-Log "  Set check-out: $($checkoutTime.ToString('HH:mm'))"
-            } catch {
-                Write-Log "  Gio khong hop le! Dung mac dinh."
-                $checkoutTime = $defaultCheckout
-            }
-        } else {
+    # Input with timeout using background job
+    $userInput = $null
+    $job = Start-Job -ScriptBlock { [Console]::ReadLine() }
+    if (Wait-Job $job -Timeout 30) {
+        $userInput = Receive-Job $job
+    }
+    Remove-Job $job -Force -ErrorAction SilentlyContinue
+
+    if ($userInput -and $userInput.Trim()) {
+        try {
+            $parts = $userInput.Trim().Replace("h", ":").Replace("H", ":").Split(":")
+            $h = [int]$parts[0]
+            $m = if ($parts.Length -gt 1) { [int]$parts[1] } else { 0 }
+            $checkoutTime = (Get-Date).Date.AddHours($h).AddMinutes($m)
+            if ($checkoutTime -le (Get-Date)) { $checkoutTime = $checkoutTime.AddDays(1) }
+            Write-Log "  Set check-out: $($checkoutTime.ToString('HH:mm'))"
+        } catch {
+            Write-Log "  Gio khong hop le! Dung mac dinh."
             $checkoutTime = $defaultCheckout
-            Write-Log "  Dung mac dinh: $($checkoutTime.ToString('HH:mm'))"
         }
     } else {
         Write-Host ""
