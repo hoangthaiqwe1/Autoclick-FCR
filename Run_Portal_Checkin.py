@@ -290,13 +290,9 @@ def wait_and_login():
 # === CHECK-IN / CHECK-OUT ===
 def get_today_attendance():
     """Lay thong tin cham cong hom nay tu API HR Portal."""
-    now = datetime.now()
-    month = now.strftime("%m")
-    year = now.strftime("%Y")
-    today_str = now.strftime("%Y-%m-%d")
     js = """
     (function() {
-        return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/attendance-in-period?Month=""" + month + """&Year=""" + year + """', {
+        return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info', {
             method: 'GET',
             headers: {'Accept': 'application/json'},
             credentials: 'include'
@@ -311,15 +307,28 @@ def get_today_attendance():
             if value and not value.startswith("ERR"):
                 data = json.loads(value)
                 if isinstance(data, dict) and data.get("status"):
-                    records = data.get("data", [])
-                    for record in records:
-                        check_date = record.get("checkDate", "")
-                        if check_date.startswith(today_str):
-                            return {
-                                "checkin": record.get("checkInTime"),
-                                "checkout": record.get("checkOutTime"),
-                                "status": record.get("status")
-                            }
+                    info = data.get("data", {})
+                    checkin_raw = info.get("checkInTime")
+                    checkout_raw = info.get("checkOutTime")
+                    # Format: "2026-08-26T08:12:07.109059" -> "08:12:07"
+                    checkin_display = ""
+                    checkout_display = ""
+                    if checkin_raw:
+                        try:
+                            checkin_display = datetime.strptime(checkin_raw[:19], "%Y-%m-%dT%H:%M:%S").strftime("%H:%M:%S")
+                        except:
+                            checkin_display = checkin_raw
+                    if checkout_raw:
+                        try:
+                            checkout_display = datetime.strptime(checkout_raw[:19], "%Y-%m-%dT%H:%M:%S").strftime("%H:%M:%S")
+                        except:
+                            checkout_display = checkout_raw
+                    return {
+                        "checkin": checkin_display,
+                        "checkout": checkout_display,
+                        "status": info.get("status"),
+                        "fullName": info.get("fullName", "")
+                    }
         except:
             pass
     return None
