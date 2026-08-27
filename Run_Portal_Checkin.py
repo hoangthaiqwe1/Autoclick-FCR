@@ -495,9 +495,12 @@ def main():
             log("DEN GIO CHECK-OUT!")
             time.sleep(2)
             
-            # Kiem tra session con song khong — neu bi logout thi login lai
+            # Reload page
+            run_js("window.location.href='https://hrportal.fecredit.com.vn/work-attendance';")
+            time.sleep(5)
+            
+            # Kiem tra can login lai khong
             tabs = get_page_tabs()
-            need_relogin = False
             if tabs:
                 current_url = ""
                 for t in tabs:
@@ -505,15 +508,7 @@ def main():
                         current_url = t.get("url", "")
                         break
                 if "sign-in" in current_url or "microsoftonline" in current_url:
-                    need_relogin = True
-            else:
-                need_relogin = True
-            
-            if need_relogin:
-                log("  Session het han, dang login lai...")
-                if not start_chrome(HR_PORTAL_URL):
-                    log("  Khong mo duoc Chrome!")
-                else:
+                    log("  Can login lai...")
                     wait_and_login()
                     run_js("window.location.href='https://hrportal.fecredit.com.vn/work-attendance';")
                     time.sleep(5)
@@ -527,26 +522,6 @@ def main():
         hours_left = int(remaining // 3600)
         mins_left = int((remaining % 3600) // 60)
         log(f"  Con {hours_left}h {mins_left}p -> check-out luc {checkout_time.strftime('%H:%M')}")
-        
-        # Auto click "Dong y" neu popup phien het han xuat hien
-        run_js("""(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){var t=btns[i].textContent;if(t.indexOf('ồng')!==-1||t.indexOf('Dong')!==-1){btns[i].click();return'OK';}}return'NO';})()""")
-        
-        # Kiem tra xem bi redirect ve sign-in chua — neu bi thi click Dong y + login lai
-        tabs = get_page_tabs()
-        if tabs:
-            current_url = ""
-            for t in tabs:
-                if t.get("type") == "page":
-                    current_url = t.get("url", "")
-                    break
-            if "sign-in" in current_url:
-                log("  Bi redirect ve sign-in, dang login lai...")
-                # Click Dong y truoc (neu co popup)
-                run_js("""(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){var t=btns[i].textContent;if(t.indexOf('ồng')!==-1||t.indexOf('Dong')!==-1){btns[i].click();return'OK';}}return'NO';})()""")
-                time.sleep(2)
-                wait_and_login()
-                run_js("window.location.href='https://hrportal.fecredit.com.vn/work-attendance';")
-                time.sleep(5)
 
         # Gan den gio thi check thuong xuyen hon
         if remaining < 60:

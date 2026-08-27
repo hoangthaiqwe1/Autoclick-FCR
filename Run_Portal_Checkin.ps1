@@ -529,20 +529,20 @@ function Main {
             Write-Log "DEN GIO CHECK-OUT!"
             Start-Sleep -Seconds 2
             
-            # Kiem tra session con song khong
+            # Reload page
+            Invoke-JS "window.location.href='https://hrportal.fecredit.com.vn/work-attendance';" | Out-Null
+            Start-Sleep -Seconds 5
+            
+            # Kiem tra can login lai khong
             $tabs = Get-PageTabs
-            $needRelogin = $false
             if ($tabs) {
                 $currentUrl = ($tabs | Where-Object { $_.type -eq "page" } | Select-Object -First 1).url
-                if ($currentUrl -match "sign-in|microsoftonline") { $needRelogin = $true }
-            } else { $needRelogin = $true }
-            
-            if ($needRelogin) {
-                Write-Log "  Session het han, dang login lai..."
-                Start-ChromeBrowser $HR_PORTAL_URL | Out-Null
-                Wait-AndLogin | Out-Null
-                Invoke-JS "window.location.href='https://hrportal.fecredit.com.vn/work-attendance';" | Out-Null
-                Start-Sleep -Seconds 5
+                if ($currentUrl -match "sign-in|microsoftonline") {
+                    Write-Log "  Can login lai..."
+                    Wait-AndLogin | Out-Null
+                    Invoke-JS "window.location.href='https://hrportal.fecredit.com.vn/work-attendance';" | Out-Null
+                    Start-Sleep -Seconds 5
+                }
             }
             
             Invoke-CheckOut | Out-Null
@@ -555,23 +555,6 @@ function Main {
         $hoursLeft = [Math]::Floor($remaining / 3600)
         $minsLeft = [Math]::Floor(($remaining % 3600) / 60)
         Write-Log "  Con ${hoursLeft}h ${minsLeft}p -> check-out luc $($checkoutTime.ToString('HH:mm'))"
-
-        # Auto click "Dong y" neu popup phien het han xuat hien
-        Invoke-JS "(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){var t=btns[i].textContent;if(t.indexOf('ồng')!==-1||t.indexOf('Dong')!==-1){btns[i].click();return'OK';}}return'NO';})()" | Out-Null
-        
-        # Kiem tra bi redirect ve sign-in chua
-        $tabs = Get-PageTabs
-        if ($tabs) {
-            $currentUrl = ($tabs | Where-Object { $_.type -eq "page" } | Select-Object -First 1).url
-            if ($currentUrl -match "sign-in") {
-                Write-Log "  Bi redirect ve sign-in, dang login lai..."
-                Invoke-JS "(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){var t=btns[i].textContent;if(t.indexOf('ồng')!==-1||t.indexOf('Dong')!==-1){btns[i].click();return'OK';}}return'NO';})()" | Out-Null
-                Start-Sleep -Seconds 2
-                Wait-AndLogin | Out-Null
-                Invoke-JS "window.location.href='https://hrportal.fecredit.com.vn/work-attendance';" | Out-Null
-                Start-Sleep -Seconds 5
-            }
-        }
 
         if ($remaining -lt 60) { Start-Sleep -Seconds 10 }
         elseif ($remaining -lt 300) { Start-Sleep -Seconds 30 }
