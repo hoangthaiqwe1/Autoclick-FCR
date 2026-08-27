@@ -43,6 +43,15 @@ $CHROME_PATHS = @(
     "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
 )
 
+# ==================== HELPER ====================
+
+function Get-FirstPageUrl($tabs) {
+    if (-not $tabs) { return "" }
+    $page = $tabs | Where-Object { $_.type -eq "page" } | Select-Object -First 1
+    if ($page) { return $page.url }
+    return ""
+}
+
 # ==================== FUNCTIONS ====================
 
 function Write-Log($msg) {
@@ -210,6 +219,14 @@ function Invoke-JS($code) {
     }
 }
 
+# === Helper: Check if URL indicates successful login ===
+function Test-LoginSuccess($url) {
+    if (-not $url) { return $false }
+    if ($url -match "work-attendance") { return $true }
+    if ($url -match "hrportal" -and $url -notmatch "sign-in") { return $true }
+    return $false
+}
+
 # === LOGIN ===
 function Wait-AndLogin {
     for ($attempt = 1; $attempt -le 8; $attempt++) {
@@ -217,21 +234,20 @@ function Wait-AndLogin {
         $tabs = Get-PageTabs
         if (-not $tabs) { continue }
 
-        $url = ""
-        foreach ($t in $tabs) {
-            if ($t.type -eq "page") { $url = $t.url; break }
-        }
+        $url = Get-FirstPageUrl $tabs
+        $displayUrl = if ($url.Length -gt 70) { $url.Substring(0, 70) } else { $url }
+        Write-Log "  [$attempt] $displayUrl"
 
-        Write-Log "  [$attempt] $($url.Substring(0, [Math]::Min($url.Length, 70)))"
-
-        if ($url -match "work-attendance" -or ($url -match "hrportal" -and $url -notmatch "sign-in")) {
+        # Already on attendance page = success
+        if (Test-LoginSuccess $url) {
             Write-Log "  Login thanh cong!"
             return $true
         }
 
+        # HR Portal sign-in page (not Microsoft)
         if ($url -match "sign-in" -and $url -notmatch "microsoftonline") {
             # Click "Dong y" neu co popup "Phien lam viec sap het han"
-            Invoke-JS "(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){if(btns[i].textContent.indexOf('ng ')!==-1||btns[i].textContent.indexOf('Dong')!==-1||btns[i].textContent.indexOf('ồng')!==-1){btns[i].click();return'CLICKED_DONGY';}}return'NO_POPUP';})()" | Out-Null
+            Invoke-JS "(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){if(btns[i].textContent.indexOf('ng ')!==-1||btns[i].textContent.indexOf('Dong')!==-1||btns[i].textContent.indexOf('\u1ED3ng')!==-1){btns[i].click();return'CLICKED_DONGY';}}return'NO_POPUP';})()" | Out-Null
             Start-Sleep -Seconds 2
             # Click Azure AD
             Invoke-JS "(function(){var b=document.querySelectorAll('button,a');for(var i=0;i<b.length;i++){if(b[i].textContent.indexOf('Azure')!==-1){b[i].click();return;}}})()"|Out-Null
@@ -239,6 +255,7 @@ function Wait-AndLogin {
             continue
         }
 
+        # Microsoft login page
         if ($url -match "microsoftonline|login\.live") {
             # Pick account
             $r = Invoke-JS "(function(){var t=document.getElementById('tilesHolder');if(t){var f=t.querySelector('div[tabindex],div.table-row,[data-test-id]');if(f){f.click();return'PICKED';}}var rows=document.querySelectorAll('.table-row,[role=""button""]');for(var i=0;i<rows.length;i++){if(rows[i].textContent.indexOf('thai.dang')!==-1||rows[i].textContent.indexOf('fecredit')!==-1){rows[i].click();return'PICKED';}}return'NO';})()"
@@ -246,28 +263,35 @@ function Wait-AndLogin {
 
             if ($rStr -match "PICKED") {
                 # Cho redirect (Face Auth)
+                $pickedDone = $false
                 for ($w = 0; $w -lt 12; $w++) {
                     Start-Sleep -Seconds 5
                     $tabs = Get-PageTabs
-                    if ($tabs) {
-                        foreach ($t in $tabs) { if ($t.type -eq "page") { $url = $t.url; break } }
-                        if ($url -match "work-attendance" -or ($url -match "hrportal" -and $url -notmatch "sign-in")) {
-                            Write-Log "  Login thanh cong (Face Auth)!"
-                            return $true
-                        }
-                        if ($url -match "microsoftonline") {
-                            $check = Invoke-JS "(function(){if(document.querySelector('input[name=""passwd""],#i0118'))return'PASS';if(document.getElementById('idSIButton9'))return'BTN';return'WAIT';})()"
-                            if ("$check" -match "PASS|BTN") { break }
-                            continue
-                        } else { break }
+                    if (-not $tabs) { continue }
+                    $url = Get-FirstPageUrl $tabs
+
+                    if (Test-LoginSuccess $url) {
+                        Write-Log "  Login thanh cong (Face Auth)!"
+                        return $true
                     }
+                    if ($url -match "microsoftonline") {
+                        $check = Invoke-JS "(function(){if(document.querySelector('input[name=""passwd""],#i0118'))return'PASS';if(document.getElementById('idSIButton9'))return'BTN';return'WAIT';})()"
+                        if ("$check" -match "PASS|BTN") {
+                            $pickedDone = $true
+                            break
+                        }
+                        continue
+                    }
+                    # URL changed to something else - break
+                    $pickedDone = $true
+                    break
                 }
 
-                # Check URL
+                # Re-check URL after wait
                 $tabs = Get-PageTabs
                 if ($tabs) {
-                    foreach ($t in $tabs) { if ($t.type -eq "page") { $url = $t.url; break } }
-                    if ($url -match "work-attendance" -or ($url -match "hrportal" -and $url -notmatch "sign-in")) {
+                    $url = Get-FirstPageUrl $tabs
+                    if (Test-LoginSuccess $url) {
                         Write-Log "  Login thanh cong!"
                         return $true
                     }
@@ -275,6 +299,7 @@ function Wait-AndLogin {
             }
 
             # Nhap Email
+            $rStr = ""
             for ($i = 0; $i -lt 5; $i++) {
                 Start-Sleep -Seconds 2
                 $r = Invoke-JS "(function(){var f=document.querySelector('input[name=""loginfmt""],#i0116');if(f){f.focus();f.value='$HR_USERNAME';f.dispatchEvent(new Event('input',{bubbles:true}));return'OK';}if(document.querySelector('input[name=""passwd""],#i0118'))return'PASS';return'W';})()"
@@ -292,8 +317,8 @@ function Wait-AndLogin {
                 Start-Sleep -Seconds 2
                 $tabs = Get-PageTabs
                 if ($tabs) {
-                    foreach ($t in $tabs) { if ($t.type -eq "page") { $url = $t.url; break } }
-                    if ($url -match "work-attendance" -or ($url -match "hrportal" -and $url -notmatch "sign-in")) {
+                    $url = Get-FirstPageUrl $tabs
+                    if (Test-LoginSuccess $url) {
                         Write-Log "  Login thanh cong!"
                         return $true
                     }
@@ -309,20 +334,24 @@ function Wait-AndLogin {
             # Cho MFA/redirect
             for ($mfa = 0; $mfa -lt 24; $mfa++) {
                 $tabs = Get-PageTabs
-                if ($tabs) {
-                    foreach ($t in $tabs) { if ($t.type -eq "page") { $url = $t.url; break } }
-                    if ($url -match "work-attendance" -or ($url -match "hrportal" -and $url -notmatch "sign-in")) {
-                        Write-Log "  Login thanh cong!"
-                        return $true
-                    }
-                    if ($url -match "microsoftonline") {
-                        Invoke-JS "(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type=""submit""]');if(b)b.click();})()" | Out-Null
-                        if ($mfa -eq 0) { Write-Log "  Dang cho xac thuc MFA..." }
-                        Start-Sleep -Seconds 5
-                        continue
-                    } else { return $true }
+                if (-not $tabs) {
+                    Start-Sleep -Seconds 5
+                    continue
                 }
-                Start-Sleep -Seconds 5
+                $url = Get-FirstPageUrl $tabs
+
+                if (Test-LoginSuccess $url) {
+                    Write-Log "  Login thanh cong!"
+                    return $true
+                }
+                if ($url -match "microsoftonline") {
+                    Invoke-JS "(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type=""submit""]');if(b)b.click();})()" | Out-Null
+                    if ($mfa -eq 0) { Write-Log "  Dang cho xac thuc MFA..." }
+                    Start-Sleep -Seconds 5
+                    continue
+                }
+                # URL is something else entirely - assume success
+                return $true
             }
             Write-Log "  Het thoi gian cho MFA"
             return $true
@@ -441,7 +470,7 @@ function Main {
         Start-Sleep -Seconds 3
         $tabs = Get-PageTabs
         if ($tabs) {
-            $currentUrl = ($tabs | Where-Object { $_.type -eq "page" } | Select-Object -First 1).url
+            $currentUrl = Get-FirstPageUrl $tabs
             if ($currentUrl -match "work-attendance" -and $currentUrl -notmatch "sign-in") { break }
         }
     }
@@ -486,7 +515,7 @@ function Main {
     # Hoi gio check-out (30 giay)
     Write-Host "  Nhap gio check-out (VD: 17:30) [30s]: " -NoNewline
     $checkoutTime = $defaultCheckout
-    
+
     # Input with timeout using background job
     $userInput = $null
     $job = Start-Job -ScriptBlock { [Console]::ReadLine() }
@@ -528,15 +557,15 @@ function Main {
         if ($remaining -le 0) {
             Write-Log "DEN GIO CHECK-OUT!"
             Start-Sleep -Seconds 2
-            
+
             # Reload page
             Invoke-JS "window.location.href='https://hrportal.fecredit.com.vn/work-attendance';" | Out-Null
             Start-Sleep -Seconds 5
-            
+
             # Kiem tra can login lai khong
             $tabs = Get-PageTabs
             if ($tabs) {
-                $currentUrl = ($tabs | Where-Object { $_.type -eq "page" } | Select-Object -First 1).url
+                $currentUrl = Get-FirstPageUrl $tabs
                 if ($currentUrl -match "sign-in|microsoftonline") {
                     Write-Log "  Can login lai..."
                     Wait-AndLogin | Out-Null
@@ -544,7 +573,7 @@ function Main {
                     Start-Sleep -Seconds 5
                 }
             }
-            
+
             Invoke-CheckOut | Out-Null
             Write-Host ""
             Write-Log "=== HOAN TAT! ==="
