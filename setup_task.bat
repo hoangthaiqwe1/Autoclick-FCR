@@ -6,25 +6,26 @@ echo   CAI DAT TU DONG CHAM CONG 8H SANG
 echo ============================================
 echo.
 
-:: Tao task chay luc 8:00 moi ngay (Thu 2 - Thu 6)
-schtasks /create /tn "FECredit_AutoCheckin" /tr "python \"C:\Users\DANGLEHOANGTHAI\Downloads\Auto click\auto_schedule.py\"" /sc weekly /d MON,TUE,WED,THU,FRI /st 08:00 /f
+:: Lay duong dan hien tai
+set SCRIPT_DIR=%~dp0
+
+:: Tao task chay luc 7:55 moi ngay (Thu 2 - Thu 6)
+schtasks /create /tn "FECredit_AutoCheckin" /tr "python \"%SCRIPT_DIR%auto_schedule.py\"" /sc weekly /d MON,TUE,WED,THU,FRI /st 07:55 /f
 
 if %errorlevel% equ 0 (
     echo.
     echo [OK] Da cai dat thanh cong!
     echo.
     echo     Task: FECredit_AutoCheckin
-    echo     Lich: 08:00 sang, Thu 2 - Thu 6
-    echo     Flow: Check-in luc 8h -> Check-out luc 17:30
+    echo     Lich: 07:55 sang, Thu 2 - Thu 6
+    echo     Script: %SCRIPT_DIR%auto_schedule.py
     echo.
-    echo     May tinh phai BAT va KHONG KHOA MAN HINH
-    echo     de script chay duoc.
+    echo     May tinh phai BAT truoc 8h.
     echo.
 ) else (
     echo.
     echo [ERROR] Khong tao duoc task!
-    echo Thu chay file nay voi quyen Administrator:
-    echo   Click phai -> Run as administrator
+    echo Thu chay file nay voi quyen Administrator.
     echo.
 )
 

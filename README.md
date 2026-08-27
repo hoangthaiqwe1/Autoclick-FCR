@@ -87,7 +87,7 @@ HR_PASSWORD=mat_khau_moi
 
 | File | Mô tả |
 |------|--------|
-| `Run_Portal_Checkin.bat` | Double-click để chạy |
+| `Run_Portal_Checkin.bat` | Double-click để chạy (thủ công) |
 | `Run_Portal_Checkin.py` | Script chính — login, check-in, chờ, check-out |
 | `auto_schedule.py` | Script chạy theo Task Scheduler (tự động mỗi ngày) |
 | `.env` | Cấu hình tài khoản (không push lên git) |
@@ -95,9 +95,7 @@ HR_PASSWORD=mat_khau_moi
 | `auto_checkin.log` | Log lịch sử hoạt động |
 | `last_checkin.txt` | Ghi nhận check-in hôm nay |
 | `chrome_profile/` | Session Chrome (giữ login, không push) |
-| `Click_CheckIn.bat` | Chạy nhanh chỉ check-in |
-| `Click_CheckOut.bat` | Chạy nhanh chỉ check-out |
-| `setup_task.bat` | Cài Task Scheduler tự động |
+| `setup_task.bat` | Cài Task Scheduler tự động chạy mỗi sáng |
 | `remove_task.bat` | Gỡ Task Scheduler |
 
 ---
