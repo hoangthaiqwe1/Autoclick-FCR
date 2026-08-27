@@ -556,6 +556,9 @@ function Main {
         $minsLeft = [Math]::Floor(($remaining % 3600) / 60)
         Write-Log "  Con ${hoursLeft}h ${minsLeft}p -> check-out luc $($checkoutTime.ToString('HH:mm'))"
 
+        # Keep-alive: goi API nhe de giu session song
+        Invoke-JS "(function(){fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info',{credentials:'include'});})()" | Out-Null
+
         if ($remaining -lt 60) { Start-Sleep -Seconds 10 }
         elseif ($remaining -lt 300) { Start-Sleep -Seconds 30 }
         else { Start-Sleep -Seconds 300 }

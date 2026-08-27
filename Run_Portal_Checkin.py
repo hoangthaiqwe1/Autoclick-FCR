@@ -523,6 +523,9 @@ def main():
         mins_left = int((remaining % 3600) // 60)
         log(f"  Con {hours_left}h {mins_left}p -> check-out luc {checkout_time.strftime('%H:%M')}")
 
+        # Keep-alive: goi API nhe de giu session song, tranh bi hoi Face Auth lai
+        run_js("""(function(){fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info',{credentials:'include'});})()""")
+
         # Gan den gio thi check thuong xuyen hon
         if remaining < 60:
             time.sleep(10)
