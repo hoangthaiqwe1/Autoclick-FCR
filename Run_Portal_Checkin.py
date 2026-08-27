@@ -197,6 +197,10 @@ def wait_and_login():
             return True
 
         if "sign-in" in url and "microsoftonline" not in url:
+            # Click "Dong y" neu co popup "Phien lam viec sap het han"
+            run_js("""(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){var t=btns[i].textContent;if(t.indexOf('ồng')!==-1||t.indexOf('Dong')!==-1||t.indexOf('ng ')!==-1){btns[i].click();return'CLICKED';}}return'NO';})()""")
+            time.sleep(2)
+            # Click Azure AD
             run_js("""(function(){var b=document.querySelectorAll('button,a');for(var i=0;i<b.length;i++){if(b[i].textContent.indexOf('Azure')!==-1){b[i].click();return;}}})()""")
             time.sleep(8)
             continue
@@ -489,6 +493,9 @@ def main():
         mins_left = int((remaining % 3600) // 60)
         log(f"  Con {hours_left}h {mins_left}p -> check-out luc {checkout_time.strftime('%H:%M')}")
         
+        # Auto click "Dong y" neu popup phien het han xuat hien
+        run_js("""(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){var t=btns[i].textContent;if(t.indexOf('ồng')!==-1||t.indexOf('Dong')!==-1){btns[i].click();return'OK';}}return'NO';})()""")
+
         # Gan den gio thi check thuong xuyen hon
         if remaining < 60:
             time.sleep(10)

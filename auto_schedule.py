@@ -329,6 +329,9 @@ def wait_and_check_login():
 
         # Trang sign-in FE Credit -> click Azure AD
         if "sign-in" in current_url and "microsoftonline" not in current_url:
+            # Click "Dong y" neu co popup "Phien lam viec sap het han"
+            run_js_in_tab("""(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){var t=btns[i].textContent;if(t.indexOf('ồng')!==-1||t.indexOf('Dong')!==-1){btns[i].click();return'CLICKED';}}return'NO';})()""")
+            time.sleep(2)
             log("  Click Azure AD...")
             js = """
             (function() {

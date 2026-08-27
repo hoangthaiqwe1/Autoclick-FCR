@@ -230,6 +230,10 @@ function Wait-AndLogin {
         }
 
         if ($url -match "sign-in" -and $url -notmatch "microsoftonline") {
+            # Click "Dong y" neu co popup "Phien lam viec sap het han"
+            Invoke-JS "(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){if(btns[i].textContent.indexOf('ng ')!==-1||btns[i].textContent.indexOf('Dong')!==-1||btns[i].textContent.indexOf('ồng')!==-1){btns[i].click();return'CLICKED_DONGY';}}return'NO_POPUP';})()" | Out-Null
+            Start-Sleep -Seconds 2
+            # Click Azure AD
             Invoke-JS "(function(){var b=document.querySelectorAll('button,a');for(var i=0;i<b.length;i++){if(b[i].textContent.indexOf('Azure')!==-1){b[i].click();return;}}})()"|Out-Null
             Start-Sleep -Seconds 8
             continue
@@ -526,6 +530,9 @@ function Main {
         $hoursLeft = [Math]::Floor($remaining / 3600)
         $minsLeft = [Math]::Floor(($remaining % 3600) / 60)
         Write-Log "  Con ${hoursLeft}h ${minsLeft}p -> check-out luc $($checkoutTime.ToString('HH:mm'))"
+
+        # Auto click "Dong y" neu popup phien het han xuat hien
+        Invoke-JS "(function(){var btns=document.querySelectorAll('button');for(var i=0;i<btns.length;i++){var t=btns[i].textContent;if(t.indexOf('ồng')!==-1||t.indexOf('Dong')!==-1){btns[i].click();return'OK';}}return'NO';})()" | Out-Null
 
         if ($remaining -lt 60) { Start-Sleep -Seconds 10 }
         elseif ($remaining -lt 300) { Start-Sleep -Seconds 30 }
