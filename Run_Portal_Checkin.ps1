@@ -436,7 +436,15 @@ function Main {
 
     # Navigate ve work-attendance
     Invoke-JS "window.location.href='https://hrportal.fecredit.com.vn/work-attendance';" | Out-Null
-    Start-Sleep -Seconds 5
+    # Cho trang load xong
+    for ($w = 0; $w -lt 10; $w++) {
+        Start-Sleep -Seconds 3
+        $tabs = Get-PageTabs
+        if ($tabs) {
+            $currentUrl = ($tabs | Where-Object { $_.type -eq "page" } | Select-Object -First 1).url
+            if ($currentUrl -match "work-attendance" -and $currentUrl -notmatch "sign-in") { break }
+        }
+    }
 
     # Buoc 2: Kiem tra check-in
     Write-Log "Buoc 2: Kiem tra check-in..."

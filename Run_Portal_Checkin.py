@@ -411,7 +411,18 @@ def main():
 
     # Dam bao dang o trang work-attendance truoc khi goi API
     run_js("window.location.href='https://hrportal.fecredit.com.vn/work-attendance';")
-    time.sleep(5)
+    # Cho trang load xong (check URL thuc su)
+    for _wait in range(10):
+        time.sleep(3)
+        tabs = get_page_tabs()
+        if tabs:
+            for t in tabs:
+                if t.get("type") == "page":
+                    if "work-attendance" in t.get("url", "") and "sign-in" not in t.get("url", ""):
+                        break
+            else:
+                continue
+            break
 
     # Buoc 2: Kiem tra check-in
     log("Buoc 2: Kiem tra check-in...")
