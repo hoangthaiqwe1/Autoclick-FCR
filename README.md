@@ -53,7 +53,7 @@ CHECKOUT_MINUTE=0
 
 **Double-click** file `Run_Portal_Checkin.bat`
 
-Hoặc mở CMD/PowerShell:
+Hoặc mở CMD:
 
 ```
 cd "C:\DEV\Auto click"
