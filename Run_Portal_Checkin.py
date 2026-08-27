@@ -523,8 +523,15 @@ def main():
         mins_left = int((remaining % 3600) // 60)
         log(f"  Con {hours_left}h {mins_left}p -> check-out luc {checkout_time.strftime('%H:%M')}")
 
-        # Keep-alive: goi API nhe de giu session song, tranh bi hoi Face Auth lai
-        run_js("""(function(){fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info',{credentials:'include'});})()""")
+        # Keep-alive: goi API nhe de giu session song
+        ka = run_js("""(function(){return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info',{credentials:'include'}).then(function(r){return 'KA:'+r.status;}).catch(function(e){return 'KA_ERR:'+e.message;});})()""")
+        ka_str = ""
+        if ka:
+            try:
+                ka_str = ka.get("result", {}).get("result", {}).get("value", "")
+            except:
+                ka_str = str(ka)
+        log(f"  Keep-alive: {ka_str}")
 
         # Gan den gio thi check thuong xuyen hon
         if remaining < 60:

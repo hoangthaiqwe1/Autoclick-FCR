@@ -586,7 +586,10 @@ function Main {
         Write-Log "  Con ${hoursLeft}h ${minsLeft}p -> check-out luc $($checkoutTime.ToString('HH:mm'))"
 
         # Keep-alive: goi API nhe de giu session song
-        Invoke-JS "(function(){fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info',{credentials:'include'});})()" | Out-Null
+        $ka = Invoke-JS "(function(){return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info',{credentials:'include'}).then(function(r){return 'KA:'+r.status;}).catch(function(e){return 'KA_ERR:'+e.message;});})()"
+        $kaStr = ""
+        if ($ka -and $ka.result -and $ka.result.result) { $kaStr = $ka.result.result.value }
+        Write-Log "  Keep-alive: $kaStr"
 
         if ($remaining -lt 60) { Start-Sleep -Seconds 10 }
         elseif ($remaining -lt 300) { Start-Sleep -Seconds 30 }
