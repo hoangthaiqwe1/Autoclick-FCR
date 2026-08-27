@@ -277,7 +277,23 @@ def wait_and_login():
                         log("  Login thanh cong!")
                         return True
                     if "microsoftonline" in url:
-                        run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
+                        # Thu click "Use your password instead" de khoi can Face Auth
+                        r = run_js("""(function(){var links=document.querySelectorAll('a');for(var i=0;i<links.length;i++){if(links[i].textContent.indexOf('password')!==-1||links[i].textContent.indexOf('Password')!==-1){links[i].click();return'CLICKED_PWD';}}var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b){b.click();return'CLICKED_BTN';}return'NO';})()""")
+                        if r and "CLICKED_PWD" in str(r):
+                            log("  Click 'Use your password instead'...")
+                            time.sleep(3)
+                            # Nhap password
+                            for _ in range(5):
+                                time.sleep(2)
+                                r2 = run_js(f"""(function(){{var f=document.querySelector('input[name="passwd"],#i0118');if(f){{f.focus();f.value='{HR_PASSWORD}';f.dispatchEvent(new Event('input',{{bubbles:true}}));return'OK';}}return'W';}})()""")
+                                if r2 and "'OK'" in str(r2): break
+                            time.sleep(1)
+                            run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
+                            time.sleep(6)
+                            # Click Stay signed in
+                            run_js("""(function(){var b=document.getElementById('idSIButton9')||document.querySelector('input[type="submit"]');if(b)b.click();})()""")
+                            time.sleep(5)
+                            continue
                         if mfa_wait == 0:
                             log("  Dang cho xac thuc MFA...")
                         time.sleep(5)
