@@ -115,7 +115,8 @@ def start_chrome(url):
         return False
     if is_port_open(CDP_PORT):
         return True
-    user_data = os.path.join(SCRIPT_DIR, "chrome_profile")
+    # Dung profile Chrome mac dinh (da luu session "Remember 15 days")
+    user_data = os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data")
     subprocess.Popen([chrome, f"--remote-debugging-port={CDP_PORT}", f"--user-data-dir={user_data}", "--no-first-run", "--no-default-browser-check", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(30):
         if is_port_open(CDP_PORT):
