@@ -361,72 +361,103 @@ function Wait-AndLogin {
 }
 
 # === CHECK-IN / CHECK-OUT ===
-function Get-TodayAttendance {
-    $js = @"
-(function() {
-    return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info', {
-        method: 'GET',
-        headers: {'Accept': 'application/json'},
-        credentials: 'include'
-    }).then(function(r) { return r.text(); })
-    .catch(function(e) { return 'ERR:' + e.message; });
-})()
-"@
-    $r = Invoke-JS $js
-    if ($r -and $r.result -and $r.result.result -and $r.result.result.value) {
-        $value = $r.result.result.value
-        if ($value -notmatch "^ERR:") {
-            try {
-                $data = $value | ConvertFrom-Json
-                if ($data.status -eq $true -and $data.data) {
-                    $checkin = ""
-                    $checkout = ""
-                    if ($data.data.checkInTime) {
-                        try { $checkin = ([datetime]::Parse($data.data.checkInTime)).ToString("HH:mm:ss") } catch { $checkin = $data.data.checkInTime }
-                    }
-                    if ($data.data.checkOutTime) {
-                        try { $checkout = ([datetime]::Parse($data.data.checkOutTime)).ToString("HH:mm:ss") } catch { $checkout = $data.data.checkOutTime }
-                    }
-                    return @{ checkin = $checkin; checkout = $checkout; status = $data.data.status; fullName = $data.data.fullName }
-                }
-            } catch {}
+function Get-CookiesFromChrome {
+    # Lay cookie tu Chrome qua CDP
+    $tabs = Get-PageTabs
+    if (-not $tabs) { return "" }
+    $tab = $tabs | Where-Object { $_.type -eq "page" } | Select-Object -First 1
+    if (-not $tab) { return "" }
+    $ws = $tab.webSocketDebuggerUrl
+    if (-not $ws) { return "" }
+    
+    $command = @{
+        id = 1
+        method = "Network.getCookies"
+        params = @{ urls = @("https://hrportal.fecredit.com.vn") }
+    } | ConvertTo-Json -Depth 5
+    
+    try {
+        $result = Send-WebSocketMessage $ws $command
+        if ($result -and $result.result -and $result.result.cookies) {
+            $cookieStr = ""
+            foreach ($c in $result.result.cookies) {
+                if ($cookieStr) { $cookieStr += "; " }
+                $cookieStr += "$($c.name)=$($c.value)"
+            }
+            return $cookieStr
         }
+    } catch {}
+    return ""
+}
+
+function Invoke-HRApi($path, $method = "GET") {
+    $cookies = Get-CookiesFromChrome
+    if (-not $cookies) { return $null }
+    
+    $headers = @{
+        "Accept" = "application/json"
+        "Content-Type" = "application/json"
+        "Cookie" = $cookies
+    }
+    
+    $url = "https://hrportal.fecredit.com.vn/api/v1/employee-attendance/$path"
+    
+    try {
+        if ($method -eq "POST") {
+            $response = Invoke-RestMethod -Uri $url -Method POST -Headers $headers -Proxy "" -TimeoutSec 15
+        } else {
+            $response = Invoke-RestMethod -Uri $url -Method GET -Headers $headers -Proxy "" -TimeoutSec 15
+        }
+        return $response
+    } catch {
+        return $null
+    }
+}
+
+function Get-TodayAttendance {
+    $data = Invoke-HRApi "account-info"
+    if ($data -and $data.status -eq $true -and $data.data) {
+        $checkin = ""
+        $checkout = ""
+        if ($data.data.checkInTime) {
+            try { $checkin = ([datetime]::Parse($data.data.checkInTime)).ToString("HH:mm:ss") } catch { $checkin = $data.data.checkInTime }
+        }
+        if ($data.data.checkOutTime) {
+            try { $checkout = ([datetime]::Parse($data.data.checkOutTime)).ToString("HH:mm:ss") } catch { $checkout = $data.data.checkOutTime }
+        }
+        return @{ checkin = $checkin; checkout = $checkout; status = $data.data.status; fullName = $data.data.fullName }
     }
     return $null
 }
 
 function Invoke-CheckIn {
     Write-Log ">>> CHECK-IN"
-    $js = "(function(){return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/check-in',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},credentials:'include'}).then(function(r){return r.text().then(function(t){return'STATUS:'+r.status+' '+t;});}).catch(function(e){return'ERR:'+e.message;});})()"
-    $r = Invoke-JS $js
-    $rStr = "$r"
-    Write-Log "  $rStr"
-
-    if ($rStr -match "STATUS:200|STATUS:201") {
+    $data = Invoke-HRApi "check-in" "POST"
+    Write-Log "  Response: $($data | ConvertTo-Json -Compress -Depth 3)"
+    
+    if ($data -and ($data.status -eq $true -or $data.code -eq "00")) {
         Set-Content -Path $CHECKIN_RECORD_FILE -Value (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
         Write-Log "  CHECK-IN THANH CONG!"
-        Invoke-JS "window.location.href='https://hrportal.fecredit.com.vn/work-attendance';" | Out-Null
         return $true
-    } elseif ($rStr -match "CHECKIN_FAILED|`"code`":`"11`"") {
+    } elseif ($data -and ($data.code -eq "11" -or $data.message -match "CHECKIN_FAILED")) {
         Set-Content -Path $CHECKIN_RECORD_FILE -Value (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-        Write-Log "  Da check-in truoc do roi (API tra CHECKIN_FAILED)"
+        Write-Log "  Da check-in truoc do roi"
         return $true
     }
+    Write-Log "  CHECK-IN THAT BAI"
     return $false
 }
 
 function Invoke-CheckOut {
     Write-Log ">>> CHECK-OUT"
-    $js = "(function(){return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/check-out',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},credentials:'include'}).then(function(r){return r.text().then(function(t){return'STATUS:'+r.status+' '+t;});}).catch(function(e){return'ERR:'+e.message;});})()"
-    $r = Invoke-JS $js
-    $rStr = "$r"
-    Write-Log "  $rStr"
-
-    if ($rStr -match "STATUS:200|STATUS:201") {
+    $data = Invoke-HRApi "check-out" "POST"
+    Write-Log "  Response: $($data | ConvertTo-Json -Compress -Depth 3)"
+    
+    if ($data -and ($data.status -eq $true -or $data.code -eq "00")) {
         Write-Log "  CHECK-OUT THANH CONG!"
-        Invoke-JS "window.location.href='https://hrportal.fecredit.com.vn/work-attendance';" | Out-Null
         return $true
     }
+    Write-Log "  CHECK-OUT THAT BAI"
     return $false
 }
 
@@ -516,13 +547,17 @@ function Main {
     Write-Host "  Nhap gio check-out (VD: 17:30) [30s]: " -NoNewline
     $checkoutTime = $defaultCheckout
 
-    # Input with timeout using background job
+    # Input with timeout - don gian, khong dung Start-Job
     $userInput = $null
-    $job = Start-Job -ScriptBlock { [Console]::ReadLine() }
-    if (Wait-Job $job -Timeout 30) {
-        $userInput = Receive-Job $job
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($sw.ElapsedMilliseconds -lt 30000) {
+        if ([Console]::KeyAvailable) {
+            $userInput = Read-Host
+            break
+        }
+        Start-Sleep -Milliseconds 200
     }
-    Remove-Job $job -Force -ErrorAction SilentlyContinue
+    $sw.Stop()
 
     if ($userInput -and $userInput.Trim()) {
         try {
@@ -586,10 +621,9 @@ function Main {
         Write-Log "  Con ${hoursLeft}h ${minsLeft}p -> check-out luc $($checkoutTime.ToString('HH:mm'))"
 
         # Keep-alive: goi API nhe de giu session song
-        $ka = Invoke-JS "(function(){return fetch('https://hrportal.fecredit.com.vn/api/v1/employee-attendance/account-info',{credentials:'include'}).then(function(r){return 'KA:'+r.status;}).catch(function(e){return 'KA_ERR:'+e.message;});})()"
-        $kaStr = ""
-        if ($ka -and $ka.result -and $ka.result.result) { $kaStr = $ka.result.result.value }
-        Write-Log "  Keep-alive: $kaStr"
+        $ka = Invoke-HRApi "account-info"
+        $kaStatus = if ($ka -and $ka.status) { "OK (status=$($ka.data.status))" } else { "FAIL" }
+        Write-Log "  Keep-alive: $kaStatus"
 
         if ($remaining -lt 60) { Start-Sleep -Seconds 10 }
         elseif ($remaining -lt 300) { Start-Sleep -Seconds 30 }
